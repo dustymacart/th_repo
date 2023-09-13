@@ -1,0 +1,10 @@
+[webservers]
+th-web201.digitalcanyon.org
+th-web202.digitalcanyon.org
+
+[dc]
+th-dc401.digitalcanyon.org
+th-dc402.digitalcanyon.org
+
+[test]
+th-web202.digitalcanyon.org
