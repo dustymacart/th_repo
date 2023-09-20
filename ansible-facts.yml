@@ -1,0 +1,7 @@
+---
+- hosts: webservers
+
+  tasks:
+    - name: Ansible facts
+      debug: 
+        msg: "{{ ansible_facts['ens33']['ipv4']['address'] }}" 

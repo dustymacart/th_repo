@@ -1,0 +1,18 @@
+---
+# This playbook deploys all site configs
+
+- name: apply base configuration to all nodes
+  hosts: webservers
+  remote_user: darthurs
+  become: yes
+
+  roles:
+  - base
+
+- name: Configure webservers
+  hosts: webservers
+  remote_user: darthurs
+  become: yes
+
+  roles:
+  - webservers  
