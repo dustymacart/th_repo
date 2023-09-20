@@ -1,0 +1,20 @@
+---
+#This playbook will install apache on linux web servers
+- hosts: webservers 
+  vars:
+    http_port: 80
+    max_clients: 200
+  remote_user: darthurs
+  become: yes
+  tasks:
+  - name: Install Apache on webservers
+    yum:
+      name: httpd
+      state: latest
+    check_mode: yes
+  - name: Apache installed and ready
+    service: 
+      name: httpd
+      enabled: true
+      state: started  
+
