@@ -1,8 +1,19 @@
 ---
-# This playbook contains base plays for all linux nodes
+# This playbook contains base plays for all nodes
 
-- name: Install firewalld
-  yum: name=firewalld state=present
+- name: Install base packages
+  yum: "name={{ item }} state=present"
+  loop: "{{ base_packages }}"
 
 - name: Start the firewalld service
   service: name=firewalld state=started enabled=yes
+
+- name: Add users
+  user:
+    name: "{{ item.name }}"
+    state: present
+    groups: "{{ item.groups }}"
+  loop:
+    - { name: 'webadmin1', groups: 'wheel' }
+    - { name: 'webadmin2', groups: 'apache' }
+
