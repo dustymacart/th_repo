@@ -1,0 +1,15 @@
+---
+# This playbook uses blocks and conditionals
+- hosts: webservers
+  remote_user: darthurs
+  become: yes
+  tasks:
+    - name: Install and start Apache
+      block:
+      - name: Install httpd
+        yum: name=httpd state=present
+
+      - name: Start service and enable it
+        service: name=httpd state=started enabled=True
+      when: ansible_facts['distribution'] == 'CentOS'
+      ignore_errors: yes

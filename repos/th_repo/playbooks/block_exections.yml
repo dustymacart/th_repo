@@ -1,0 +1,20 @@
+---
+# This playbook uses blocks and error handling
+- hosts: webservers
+  remote_user: darthurs
+  become: yes
+
+  tasks: 
+  - name: Attempt and Recovery
+    block: 
+      - debug: msg='This executes normally'
+      - name: This is a forced failure
+        command: /bin/false
+      - debug: msg='This never executes because the previous tasks fails'
+    rescue: 
+      - debug: msg='This catches an error'
+      - name: This forces a failure during recovery!
+        command: /bin/false
+      - debug: msg='This also never executes'
+    always:
+      - debug: msg="This always executes"
