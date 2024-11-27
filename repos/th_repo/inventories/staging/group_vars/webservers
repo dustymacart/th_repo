@@ -1,0 +1,4 @@
+---
+# Variables for the webservers group
+
+httpd_port: 80
