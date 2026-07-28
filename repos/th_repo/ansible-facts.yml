@@ -1,5 +1,5 @@
 ---
-- hosts: webservers
+- hosts: rhwebservers
 
   tasks:
     - name: Ansible facts
