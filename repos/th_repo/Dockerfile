@@ -7,6 +7,7 @@ RUN dnf -y update && \
         gcc-c++ \
         make \
         python3 \
+        python3-devel \
         python3-pip \
         vim \
         tar \
@@ -14,10 +15,17 @@ RUN dnf -y update && \
         findutils \
         which \
         openssh-clients \
+        krb5-workstation \
+        krb5-libs \
+        krb5-devel \
     && dnf clean all
 
-# Install Ansible
-RUN python3 -m pip install --no-cache-dir ansible
+RUN python3 -m pip install --upgrade pip setuptools wheel
+
+RUN python3 -m pip install --no-cache-dir \
+        ansible \
+        pywinrm \
+        "pywinrm[kerberos]"
 
 WORKDIR /workspace
 
