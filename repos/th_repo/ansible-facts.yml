@@ -1,7 +1,36 @@
 ---
-- hosts: rhwebservers
+- name: Ansible facts
+  hosts: rhwebservers
+  gather_facts: true
 
   tasks:
-    - name: Ansible facts
-      debug: 
-        msg: "{{ ansible_facts['ens18']['ipv4']['address'] }}" 
+    - name: Get realm information
+      ansible.builtin.command:
+        cmd: realm list
+      register: realm_info
+      changed_when: false
+
+    - name: Get time information
+      ansible.builtin.command:
+        cmd: timedatectl
+      register: time_info
+      changed_when: false
+
+    - name: Display server information
+      ansible.builtin.debug:
+        msg:
+          - "Hostname: {{ ansible_facts['fqdn'] }}"
+          - "OS: {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}"
+          - "Interface: {{ ansible_facts['default_ipv4']['interface'] }}"
+          - "IP Address: {{ ansible_facts['default_ipv4']['address'] }}"
+          - "Gateway: {{ ansible_facts['default_ipv4']['gateway'] }}"
+          - "Date/Time: {{ ansible_facts['date_time']['date'] }} {{ ansible_facts['date_time']['time'] }}"
+          - "Timezone: {{ ansible_facts['date_time']['tz'] }}"
+
+    - name: Display realm information
+      ansible.builtin.debug:
+        var: realm_info.stdout_lines
+
+    - name: Display time configuration
+      ansible.builtin.debug:
+        var: time_info.stdout_lines
