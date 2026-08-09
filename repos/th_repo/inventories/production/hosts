@@ -1,10 +1,11 @@
+[windows:vars]
+ansible_connection=winrm
+ansible_winrm_transport=kerberos
+ansible_port=5985
+
 [winwebservers]
 th-winweb01.digitalcanyon.org
 th-winweb02.digitalcanyon.org
-
-[rhwebservers]
-th-rhweb01.digitalcanyon.org
-th-rhweb02.digitalcanyon.org
 
 [dc]
 th-dc01.digitalcanyon.org
@@ -12,3 +13,7 @@ th-dc02.digitalcanyon.org
 
 [test]
 th-winweb02.digitalcanyon.org
+
+[rhwebservers]
+th-rhweb01.digitalcanyon.org
+th-rhweb02.digitalcanyon.org
