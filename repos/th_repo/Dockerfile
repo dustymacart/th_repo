@@ -15,6 +15,7 @@ RUN dnf -y update && \
         findutils \
         which \
         openssh-clients \
+        sshpass \
         krb5-workstation \
         krb5-libs \
         krb5-devel \

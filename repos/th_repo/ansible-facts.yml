@@ -4,4 +4,4 @@
   tasks:
     - name: Ansible facts
       debug: 
-        msg: "{{ ansible_facts['ens33']['ipv4']['address'] }}" 
+        msg: "{{ ansible_facts['ens18']['ipv4']['address'] }}" 
