@@ -4,7 +4,6 @@ th-web202.digitalcanyon.org
 
 [dc:vars]
 ansible_user=darthurs@digitalcanyon.org
-ansible_password=Albert12!
 ansible_port=5986
 ansible_connection=winrm
 ansible_winrm_transport=kerberos
