@@ -1,5 +1,10 @@
 FROM registry.access.redhat.com/ubi9/ubi
 
+ENV ANSIBLE_VAULT_PASSWORD_FILE=/root/.ansible/vault_pass
+
+RUN mkdir -p /root/.ansible && \
+    echo 'export ANSIBLE_VAULT_PASSWORD_FILE=/root/.ansible/vault_pass' >> /root/.bashrc
+
 RUN dnf -y update && \
     dnf -y install \
         git \
