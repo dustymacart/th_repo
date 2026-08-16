@@ -1,0 +1,26 @@
+services:
+  ansible:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    image: my-rhel9-dev
+
+    working_dir: /workspace
+
+    environment:
+      HOME: /home/dcuser
+      KRB5CCNAME: FILE:/workspace/.ansible/krb5cc_ansible
+      ANSIBLE_VAULT_PASSWORD_FILE: /home/dcuser/.ansible/vault_pass
+
+    volumes:
+      - .:/workspace
+      - ./.ansible/vault_pass:/home/dcuser/.ansible/vault_pass:ro
+
+    stdin_open: true
+    tty: true
+
+    command:
+      - bash
+      - --rcfile
+      - /workspace/.bashrc

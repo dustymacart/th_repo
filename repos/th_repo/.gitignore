@@ -1,0 +1,12 @@
+# Secrets
+.secrets/
+.ansible/vault_pass
+
+# Local SSH trust
+.ssh/known_hosts
+
+# Local shell config
+.bashrc
+
+# Ansible temporary files
+*.retry
