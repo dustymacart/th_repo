@@ -1,0 +1,12 @@
+---
+- name: Reboot Windows servers
+  hosts: winwebservers
+  gather_facts: false
+  serial: 1
+
+  tasks:
+    - name: Reboot and wait for the server to return
+      ansible.windows.win_reboot:
+        msg: "Reboot initiated by Ansible for scheduled maintenance"
+        reboot_timeout: 1800
+        post_reboot_delay: 30
