@@ -7,7 +7,7 @@ pipeline {
     }
 
     parameters {
-        choice(name: 'ENVIRONMENT', choices: ['staging', 'production'], description: 'Inventory environment to use.')
+        choice(name: 'ENVIRONMENT', choices: ['staging', 'production'], description: 'Inventory environment to use. Linux is in production and Windows is in staging.')
         choice(name: 'PLATFORM', choices: ['linux', 'windows'], description: 'Operating system family to reboot.')
         string(name: 'TARGET_GROUP', defaultValue: '', description: 'Required Ansible inventory group. Example: rhwebservers or windows_servers.')
         string(name: 'HOST_LIMIT', defaultValue: '', description: 'Optional narrower Ansible host pattern. Leave blank to use the full target group.')
