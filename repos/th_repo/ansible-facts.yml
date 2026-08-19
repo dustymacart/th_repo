@@ -34,3 +34,12 @@
     - name: Display time configuration
       ansible.builtin.debug:
         var: time_info.stdout_lines
+
+    - name: Display system uptime
+      ansible.builtin.debug:
+        msg: >-
+          Uptime:
+          {{ (ansible_uptime_seconds | int) // 86400 }} days,
+          {{ ((ansible_uptime_seconds | int) % 86400) // 3600 }} hours,
+          {{ ((ansible_uptime_seconds | int) % 3600) // 60 }} minutes,
+          {{ (ansible_uptime_seconds | int) % 60 }} seconds
