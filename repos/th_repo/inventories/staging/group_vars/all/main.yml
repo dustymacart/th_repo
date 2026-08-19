@@ -1,0 +1,2 @@
+ansible_user: "{{ vault_domain_username }}"
+ansible_password: "{{ vault_domain_password }}"

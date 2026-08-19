@@ -1,10 +1,21 @@
-[webservers]
-th-web201.digitalcanyon.org
-th-web202.digitalcanyon.org
+[winwebservers]
+th-winweb01.digitalcanyon.org
+
+[windbservers]
+th-windb01.digitalcanyon.org
 
 [dc]
-th-dc401.digitalcanyon.org
-th-dc402.digitalcanyon.org
+th-dc01.digitalcanyon.org
+th-dc02.digitalcanyon.org
 
-[test]
-th-web202.digitalcanyon.org
+[windows:children]
+winwebservers
+windbservers
+dc
+
+[windows:vars]
+ansible_connection=winrm
+ansible_port=5985
+ansible_winrm_scheme=http
+ansible_winrm_transport=ntlm
+ansible_winrm_server_cert_validation=ignore
