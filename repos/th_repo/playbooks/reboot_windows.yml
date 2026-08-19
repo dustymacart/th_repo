@@ -1,8 +1,8 @@
 ---
 - name: Reboot Windows servers
-  hosts: winwebservers
+  hosts: "{{ target_group | mandatory('target_group is required') }}"
   gather_facts: false
-  serial: 1
+  serial: "{{ reboot_batch_size | default(1) }}"
 
   tasks:
     - name: Reboot and wait for the server to return

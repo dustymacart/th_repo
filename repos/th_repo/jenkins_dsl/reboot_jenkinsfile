@@ -8,8 +8,12 @@ pipeline {
 
     parameters {
         choice(name: 'ENVIRONMENT', choices: ['staging', 'production'], description: 'Inventory environment to use. Linux is in production and Windows is in staging.')
-        choice(name: 'PLATFORM', choices: ['linux', 'windows'], description: 'Operating system family to reboot.')
-        string(name: 'TARGET_GROUP', defaultValue: '', description: 'Required Ansible inventory group. Example: rhwebservers or windows_servers.')
+        choice(name: 'PLATFORM', choices: ['windows', 'linux'], description: 'Operating system family to reboot.')
+        choice(
+            name: 'TARGET_GROUP',
+            choices: ['winwebservers', 'windbservers', 'dc', 'windows', 'rhwebservers', 'rhjenkins', 'rhckmk', 'rhsplunk', 'redhat_servers'],
+            description: 'Ansible inventory group to reboot. The group must exist in the selected environment.'
+        )
         string(name: 'HOST_LIMIT', defaultValue: '', description: 'Optional narrower Ansible host pattern. Leave blank to use the full target group.')
         string(name: 'BATCH_SIZE', defaultValue: '1', description: 'Number or percentage of hosts rebooted at a time.')
     }
@@ -30,8 +34,19 @@ pipeline {
         stage('Validate request') {
             steps {
                 script {
+                    def groupsByEnvironment = [
+                        staging: ['winwebservers', 'windbservers', 'dc', 'windows'],
+                        production: ['rhwebservers', 'rhjenkins', 'rhckmk', 'rhsplunk', 'redhat_servers']
+                    ]
                     if (!(params.TARGET_GROUP ==~ /[A-Za-z0-9_:-]+/)) {
                         error('TARGET_GROUP is required and may contain only letters, numbers, underscore, colon, and hyphen.')
+                    }
+                    if (!groupsByEnvironment[params.ENVIRONMENT].contains(params.TARGET_GROUP)) {
+                        error("TARGET_GROUP '${params.TARGET_GROUP}' does not exist in the ${params.ENVIRONMENT} inventory.")
+                    }
+                    if ((params.ENVIRONMENT == 'staging' && params.PLATFORM != 'windows') ||
+                        (params.ENVIRONMENT == 'production' && params.PLATFORM != 'linux')) {
+                        error("PLATFORM '${params.PLATFORM}' does not match the ${params.ENVIRONMENT} inventory.")
                     }
                     if (params.HOST_LIMIT && !(params.HOST_LIMIT ==~ /[A-Za-z0-9_!:,&.\-]+/)) {
                         error('HOST_LIMIT contains unsupported characters.')
