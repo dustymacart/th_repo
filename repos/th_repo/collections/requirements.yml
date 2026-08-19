@@ -1,0 +1,26 @@
+---
+collections:
+  # Windows administration
+  - name: ansible.windows
+
+  - name: community.windows
+
+  # Linux/RHEL administration
+  - name: ansible.posix
+
+  - name: community.general
+
+  # Active Directory administration
+  - name: microsoft.ad
+
+  # IIS administration
+  - name: microsoft.iis
+
+  # Windows software management
+  - name: chocolatey.chocolatey
+
+  # Certificate and PKI management
+  - name: community.crypto
+
+  # Podman administration on RHEL
+  - name: containers.podman

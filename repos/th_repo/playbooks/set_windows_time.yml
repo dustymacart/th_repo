@@ -1,0 +1,9 @@
+---
+- name: Configure Windows timezone
+  hosts: winwebservers
+  gather_facts: false
+
+  tasks:
+    - name: Set timezone to Chicago Central Time
+      community.windows.win_timezone:
+        timezone: Central Standard Time
