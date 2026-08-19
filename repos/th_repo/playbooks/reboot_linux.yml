@@ -1,6 +1,6 @@
 ---
 - name: Safely reboot Linux servers
-  hosts: rhwebservers
+  hosts: "{{ target_group | mandatory('target_group is required') }}"
   gather_facts: false
   become: true
   serial: "{{ reboot_batch_size | default(1) }}"
