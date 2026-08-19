@@ -57,12 +57,6 @@ pipeline {
             }
         }
 
-        stage('Approve reboot') {
-            steps {
-                input message: "Reboot ${params.PLATFORM} hosts in ${params.ENVIRONMENT}/${params.TARGET_GROUP}?", ok: 'Reboot hosts'
-            }
-        }
-
         stage('Reboot') {
             steps {
                 dir(env.ANSIBLE_ROOT) {
@@ -73,7 +67,7 @@ pipeline {
                             if [ -n "${HOST_LIMIT:-}" ]; then
                                 limit_args="--limit ${HOST_LIMIT}"
                             fi
-                            
+
                             ansible-playbook \
                               --vault-password-file "$VAULT_PASSWORD_FILE" \
                               -i "inventories/${ENVIRONMENT}/" \
