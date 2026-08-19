@@ -11,5 +11,11 @@ th-ckmk01.digitalcanyon.org
 [rhsplunk]
 th-spl01.digitalcanyon.org
 
+[redhat_servers:children]
+rhwebservers
+rhckmk
+rhjenkins
+rhsplunk
+
 [rhwebservers:vars]
 ansible_connection=ssh
