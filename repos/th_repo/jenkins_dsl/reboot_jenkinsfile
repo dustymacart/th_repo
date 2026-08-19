@@ -7,7 +7,7 @@ pipeline {
     }
 
     parameters {
-        choice(name: 'ENVIRONMENT', choices: ['qa', 'staging', 'production'], description: 'Inventory environment to use.')
+        choice(name: 'ENVIRONMENT', choices: ['staging', 'production'], description: 'Inventory environment to use.')
         choice(name: 'PLATFORM', choices: ['linux', 'windows'], description: 'Operating system family to reboot.')
         string(name: 'TARGET_GROUP', defaultValue: '', description: 'Required Ansible inventory group. Example: rhwebservers or windows_servers.')
         string(name: 'HOST_LIMIT', defaultValue: '', description: 'Optional narrower Ansible host pattern. Leave blank to use the full target group.')
@@ -70,9 +70,10 @@ pipeline {
                         sh '''
                             set -eu
                             limit_args=""
-                            if [ -n "${HOST_LIMIT}" ]; then
-                              limit_args="--limit ${HOST_LIMIT}"
+                            if [ -n "${HOST_LIMIT:-}" ]; then
+                                limit_args="--limit ${HOST_LIMIT}"
                             fi
+                            
                             ansible-playbook \
                               --vault-password-file "$VAULT_PASSWORD_FILE" \
                               -i "inventories/${ENVIRONMENT}/" \
