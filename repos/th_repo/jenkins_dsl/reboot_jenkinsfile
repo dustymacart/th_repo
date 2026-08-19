@@ -1,0 +1,95 @@
+pipeline {
+    agent any
+
+    options {
+        disableConcurrentBuilds()
+        timestamps()
+    }
+
+    parameters {
+        choice(name: 'ENVIRONMENT', choices: ['qa', 'staging', 'production'], description: 'Inventory environment to use.')
+        choice(name: 'PLATFORM', choices: ['linux', 'windows'], description: 'Operating system family to reboot.')
+        string(name: 'TARGET_GROUP', defaultValue: '', description: 'Required Ansible inventory group. Example: rhwebservers or windows_servers.')
+        string(name: 'HOST_LIMIT', defaultValue: '', description: 'Optional narrower Ansible host pattern. Leave blank to use the full target group.')
+        string(name: 'BATCH_SIZE', defaultValue: '1', description: 'Number or percentage of hosts rebooted at a time.')
+    }
+
+    environment {
+        ANSIBLE_FORCE_COLOR = 'false'
+        ANSIBLE_HOST_KEY_CHECKING = 'true'
+        ANSIBLE_ROOT = 'repos/th_repo'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Validate request') {
+            steps {
+                script {
+                    if (!(params.TARGET_GROUP ==~ /[A-Za-z0-9_:-]+/)) {
+                        error('TARGET_GROUP is required and may contain only letters, numbers, underscore, colon, and hyphen.')
+                    }
+                    if (params.HOST_LIMIT && !(params.HOST_LIMIT ==~ /[A-Za-z0-9_!:,&.\-]+/)) {
+                        error('HOST_LIMIT contains unsupported characters.')
+                    }
+                    if (!(params.BATCH_SIZE ==~ /([1-9][0-9]*|100%|[1-9][0-9]?%)/)) {
+                        error('BATCH_SIZE must be a positive integer or a percentage from 1% through 100%.')
+                    }
+                }
+                dir(env.ANSIBLE_ROOT) {
+                    withCredentials([file(credentialsId: 'ansible-vault-password', variable: 'VAULT_PASSWORD_FILE')]) {
+                        sh '''
+                            set -eu
+                            test -f "inventories/${ENVIRONMENT}/hosts"
+                            ansible-playbook --syntax-check \
+                              --vault-password-file "$VAULT_PASSWORD_FILE" \
+                              -i "inventories/${ENVIRONMENT}/" \
+                              "playbooks/reboot_${PLATFORM}.yml" \
+                              -e "target_group=${TARGET_GROUP}" \
+                              -e "reboot_batch_size=${BATCH_SIZE}"
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Approve reboot') {
+            steps {
+                input message: "Reboot ${params.PLATFORM} hosts in ${params.ENVIRONMENT}/${params.TARGET_GROUP}?", ok: 'Reboot hosts'
+            }
+        }
+
+        stage('Reboot') {
+            steps {
+                dir(env.ANSIBLE_ROOT) {
+                    withCredentials([file(credentialsId: 'ansible-vault-password', variable: 'VAULT_PASSWORD_FILE')]) {
+                        sh '''
+                            set -eu
+                            limit_args=""
+                            if [ -n "${HOST_LIMIT}" ]; then
+                              limit_args="--limit ${HOST_LIMIT}"
+                            fi
+                            ansible-playbook \
+                              --vault-password-file "$VAULT_PASSWORD_FILE" \
+                              -i "inventories/${ENVIRONMENT}/" \
+                              "playbooks/reboot_${PLATFORM}.yml" \
+                              -e "target_group=${TARGET_GROUP}" \
+                              -e "reboot_batch_size=${BATCH_SIZE}" \
+                              ${limit_args}
+                        '''
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            deleteDir()
+        }
+    }
+}
