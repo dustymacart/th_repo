@@ -1,0 +1,37 @@
+---
+- name: Patch Linux servers
+  hosts: "{{ target_group | mandatory('target_group is required') }}"
+  gather_facts: true
+  become: true
+  serial: "{{ patch_batch_size | default(1) }}"
+
+  pre_tasks:
+    - name: Confirm that the target is a supported Red Hat system
+      ansible.builtin.assert:
+        that:
+          - ansible_system == 'Linux'
+          - ansible_os_family == 'RedHat'
+        fail_msg: "{{ inventory_hostname }} is not a supported Red Hat Linux host; refusing to patch it."
+
+  tasks:
+    - name: Install all available package updates
+      ansible.builtin.dnf:
+        name: "*"
+        state: latest
+        update_only: true
+      register: linux_patch_result
+
+    - name: Reboot after package updates
+      ansible.builtin.reboot:
+        msg: Reboot initiated by Ansible after patching
+        post_reboot_delay: 10
+        connect_timeout: 10
+        reboot_timeout: 1800
+        test_command: whoami
+      when:
+        - patch_reboot | default(true) | bool
+        - linux_patch_result.changed
+
+  post_tasks:
+    - name: Verify Ansible connectivity after patching
+      ansible.builtin.ping:

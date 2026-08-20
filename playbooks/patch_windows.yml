@@ -1,0 +1,28 @@
+---
+- name: Patch Windows servers
+  hosts: "{{ target_group | mandatory('target_group is required') }}"
+  gather_facts: false
+  serial: "{{ patch_batch_size | default(1) }}"
+
+  pre_tasks:
+    - name: Verify Ansible connectivity before patching
+      ansible.windows.win_ping:
+
+  tasks:
+    - name: Install all applicable Windows updates
+      ansible.windows.win_updates:
+        category_names:
+          - "*"
+        reboot: "{{ patch_reboot | default(true) | bool }}"
+        reboot_timeout: 3600
+      register: windows_patch_result
+
+    - name: Report installed Windows updates
+      ansible.builtin.debug:
+        msg: >-
+          Installed {{ windows_patch_result.installed_update_count | default(0) }} update(s);
+          {{ windows_patch_result.failed_update_count | default(0) }} update(s) failed.
+
+  post_tasks:
+    - name: Verify Ansible connectivity after patching
+      ansible.windows.win_ping:

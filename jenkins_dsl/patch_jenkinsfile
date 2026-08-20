@@ -1,0 +1,122 @@
+pipeline {
+    agent any
+
+    options {
+        disableConcurrentBuilds()
+        timestamps()
+        timeout(time: 4, unit: 'HOURS')
+    }
+
+    parameters {
+        choice(name: 'ENVIRONMENT', choices: ['staging', 'production'], description: 'Inventory environment to use. Linux is in production and Windows is in staging.')
+        choice(name: 'PLATFORM', choices: ['windows', 'linux'], description: 'Operating system family to patch.')
+        choice(
+            name: 'TARGET_GROUP',
+            choices: ['winwebservers', 'windbservers', 'dc', 'windows', 'rhwebservers', 'rhjenkins', 'rhckmk', 'rhsplunk', 'redhat_servers'],
+            description: 'Ansible inventory group to patch. The group must exist in the selected environment.'
+        )
+        string(name: 'HOST_LIMIT', defaultValue: '', description: 'Optional narrower Ansible host pattern. Leave blank to use the full target group.')
+        string(name: 'BATCH_SIZE', defaultValue: '1', description: 'Number or percentage of hosts patched at a time.')
+        booleanParam(name: 'PATCH_REBOOT', defaultValue: true, description: 'Reboot hosts when installed updates require or warrant it.')
+    }
+
+    environment {
+        ANSIBLE_FORCE_COLOR = 'false'
+        ANSIBLE_HOST_KEY_CHECKING = 'true'
+        ANSIBLE_ROOT = '.'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Install Ansible collections') {
+            steps {
+                dir(env.ANSIBLE_ROOT) {
+                    sh '''
+                        set -eu
+                        ansible-galaxy collection install \
+                          --requirements-file collections/requirements.yml
+                    '''
+                }
+            }
+        }
+
+        stage('Validate request') {
+            steps {
+                script {
+                    def groupsByEnvironment = [
+                        staging: ['winwebservers', 'windbservers', 'dc', 'windows'],
+                        production: ['rhwebservers', 'rhjenkins', 'rhckmk', 'rhsplunk', 'redhat_servers']
+                    ]
+                    if (!(params.TARGET_GROUP ==~ /[A-Za-z0-9_:-]+/)) {
+                        error('TARGET_GROUP is required and may contain only letters, numbers, underscore, colon, and hyphen.')
+                    }
+                    if (!groupsByEnvironment[params.ENVIRONMENT].contains(params.TARGET_GROUP)) {
+                        error("TARGET_GROUP '${params.TARGET_GROUP}' does not exist in the ${params.ENVIRONMENT} inventory.")
+                    }
+                    if ((params.ENVIRONMENT == 'staging' && params.PLATFORM != 'windows') ||
+                        (params.ENVIRONMENT == 'production' && params.PLATFORM != 'linux')) {
+                        error("PLATFORM '${params.PLATFORM}' does not match the ${params.ENVIRONMENT} inventory.")
+                    }
+                    if (params.HOST_LIMIT && !(params.HOST_LIMIT ==~ /[A-Za-z0-9_!:,&.\-]+/)) {
+                        error('HOST_LIMIT contains unsupported characters.')
+                    }
+                    if (!(params.BATCH_SIZE ==~ /([1-9][0-9]*|100%|[1-9][0-9]?%)/)) {
+                        error('BATCH_SIZE must be a positive integer or a percentage from 1% through 100%.')
+                    }
+                }
+                dir(env.ANSIBLE_ROOT) {
+                    withCredentials([file(credentialsId: 'ansible-vault-password', variable: 'VAULT_PASSWORD_FILE')]) {
+                        sh '''
+                            set -eu
+                            test -f "inventories/${ENVIRONMENT}/hosts"
+                            test -f "playbooks/patch_${PLATFORM}.yml"
+                            ansible-playbook --syntax-check \
+                              --vault-password-file "$VAULT_PASSWORD_FILE" \
+                              -i "inventories/${ENVIRONMENT}/" \
+                              "playbooks/patch_${PLATFORM}.yml" \
+                              -e "target_group=${TARGET_GROUP}" \
+                              -e "patch_batch_size=${BATCH_SIZE}" \
+                              -e "patch_reboot=${PATCH_REBOOT}"
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Patch') {
+            steps {
+                dir(env.ANSIBLE_ROOT) {
+                    withCredentials([file(credentialsId: 'ansible-vault-password', variable: 'VAULT_PASSWORD_FILE')]) {
+                        sh '''
+                            set -eu
+                            limit_args=""
+                            if [ -n "${HOST_LIMIT:-}" ]; then
+                                limit_args="--limit ${HOST_LIMIT}"
+                            fi
+
+                            ansible-playbook \
+                              --vault-password-file "$VAULT_PASSWORD_FILE" \
+                              -i "inventories/${ENVIRONMENT}/" \
+                              "playbooks/patch_${PLATFORM}.yml" \
+                              -e "target_group=${TARGET_GROUP}" \
+                              -e "patch_batch_size=${BATCH_SIZE}" \
+                              -e "patch_reboot=${PATCH_REBOOT}" \
+                              ${limit_args}
+                        '''
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            deleteDir()
+        }
+    }
+}
