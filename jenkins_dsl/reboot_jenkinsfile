@@ -31,6 +31,18 @@ pipeline {
             }
         }
 
+        stage('Install Ansible collections') {
+            steps {
+                dir(env.ANSIBLE_ROOT) {
+                    sh '''
+                        set -eu
+                        ansible-galaxy collection install \
+                          --requirements-file collections/requirements.yml
+                    '''
+                }
+            }
+        }
+
         stage('Validate request') {
             steps {
                 script {
