@@ -21,7 +21,7 @@ pipeline {
     environment {
         ANSIBLE_FORCE_COLOR = 'false'
         ANSIBLE_HOST_KEY_CHECKING = 'true'
-        ANSIBLE_ROOT = 'repos/th_repo'
+        ANSIBLE_ROOT = '.'
     }
 
     stages {
