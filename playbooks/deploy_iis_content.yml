@@ -45,6 +45,64 @@
         path: "{{ iis_site_path }}"
         state: directory
 
+    - name: Ensure the application pool uses ApplicationPoolIdentity
+      microsoft.iis.web_app_pool:
+        name: "{{ iis_app_pool_name }}"
+        state: started
+        attributes:
+          processModel.identityType: ApplicationPoolIdentity
+
+    - name: Grant the IIS application pool access to the content directory
+      ansible.windows.win_acl:
+        path: "{{ iis_site_path }}"
+        user: "IIS AppPool\\{{ iis_app_pool_name }}"
+        rights: ReadAndExecute,ListDirectory,Read
+        type: allow
+        state: present
+        inherit: ContainerInherit, ObjectInherit
+        propagation: "None"
+
+    - name: Enable anonymous authentication as the application pool identity
+      ansible.windows.win_powershell:
+        parameters:
+          SiteName: "{{ iis_site_name }}"
+        script: |
+          param([string]$SiteName)
+
+          Import-Module WebAdministration
+          $filter = 'system.webServer/security/authentication/anonymousAuthentication'
+          $path = 'MACHINE/WEBROOT/APPHOST'
+          $enabled = Get-WebConfigurationProperty `
+            -PSPath $path `
+            -Location $SiteName `
+            -Filter $filter `
+            -Name enabled
+          $userName = Get-WebConfigurationProperty `
+            -PSPath $path `
+            -Location $SiteName `
+            -Filter $filter `
+            -Name userName
+
+          $Ansible.Changed = $false
+          if (-not [bool]$enabled.Value) {
+              Set-WebConfigurationProperty `
+                -PSPath $path `
+                -Location $SiteName `
+                -Filter $filter `
+                -Name enabled `
+                -Value $true
+              $Ansible.Changed = $true
+          }
+          if ([string]$userName.Value -ne '') {
+              Set-WebConfigurationProperty `
+                -PSPath $path `
+                -Location $SiteName `
+                -Filter $filter `
+                -Name userName `
+                -Value ''
+              $Ansible.Changed = $true
+          }
+
     - name: Stage and mirror the repository artifact
       block:
         - name: Remove content from the previous deployment staging directory
