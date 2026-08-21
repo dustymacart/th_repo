@@ -1,0 +1,69 @@
+---
+- name: Create and configure an IIS website
+  hosts: "{{ target_group | default('winwebservers') }}"
+  gather_facts: false
+
+  # These values can be edited here or overridden with -e or a vars file.
+  vars:
+    iis_site_name: pokemonindex
+    iis_site_path: C:\inetpub\pokemonindex
+    iis_site_state: started
+
+    iis_app_pool_name: pokemonindex
+    iis_app_pool_state: started
+    iis_app_pool_attributes:
+      managedRuntimeVersion: ""
+      managedPipelineMode: Integrated
+      startMode: OnDemand
+      autoStart: true
+      enable32BitAppOnWin64: false
+      processModel.identityType: ApplicationPoolIdentity
+
+    # This list is authoritative: bindings not listed here are removed.
+    # For HTTPS, add protocol: https, use_sni: true, and certificate_hash.
+    iis_site_bindings:
+      - ip: "*"
+        port: 8080
+        hostname: ""
+        protocol: http
+
+  pre_tasks:
+    - name: Verify required IIS site variables
+      ansible.builtin.assert:
+        that:
+          - iis_site_name | length > 0
+          - iis_site_path | length > 0
+          - iis_app_pool_name | length > 0
+          - iis_site_bindings | length > 0
+        fail_msg: IIS site name, path, application pool, and bindings are required.
+
+    - name: Verify Ansible connectivity
+      ansible.windows.win_ping:
+
+  tasks:
+    - name: Create the website content directory
+      ansible.windows.win_file:
+        path: "{{ iis_site_path }}"
+        state: directory
+
+    - name: Create and configure the application pool
+      microsoft.iis.web_app_pool:
+        name: "{{ iis_app_pool_name }}"
+        state: "{{ iis_app_pool_state }}"
+        attributes: "{{ iis_app_pool_attributes }}"
+
+    - name: Create and configure the website
+      microsoft.iis.website:
+        name: "{{ iis_site_name }}"
+        physical_path: "{{ iis_site_path }}"
+        application_pool: "{{ iis_app_pool_name }}"
+        state: "{{ iis_site_state }}"
+        bindings:
+          set: "{{ iis_site_bindings }}"
+
+  post_tasks:
+    - name: Report website configuration
+      ansible.builtin.debug:
+        msg: >-
+          IIS website {{ iis_site_name }} is {{ iis_site_state }} on
+          {{ inventory_hostname }} using application pool {{ iis_app_pool_name }}.

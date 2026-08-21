@@ -6,9 +6,9 @@ RUN dnf -y update && \
         gcc \
         gcc-c++ \
         make \
-        python3 \
-        python3-devel \
-        python3-pip \
+        python3.11 \
+        python3.11-devel \
+        python3.11-pip \
         vim \
         tar \
         gzip \
@@ -22,10 +22,10 @@ RUN dnf -y update && \
         shadow-utils \
     && dnf clean all
 
-RUN python3 -m pip install --upgrade pip setuptools wheel
+RUN python3.11 -m pip install --upgrade pip setuptools wheel
 
-RUN python3 -m pip install --no-cache-dir \
-        ansible \
+RUN python3.11 -m pip install --no-cache-dir \
+        "ansible>=12,<13" \
         pywinrm \
         "pywinrm[kerberos]"
 
