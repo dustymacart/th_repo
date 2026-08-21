@@ -1,0 +1,75 @@
+---
+- name: Deploy website content to IIS
+  hosts: "{{ target_group | default('winwebservers') }}"
+  gather_facts: false
+
+  vars:
+    iis_site_name: pokemonindex
+    iis_app_pool_name: pokemonindex
+    iis_site_path: C:\inetpub\pokemonindex
+    deployment_source: "{{ playbook_dir }}/../pokemon-source"
+
+  pre_tasks:
+    - name: Validate deployment settings
+      ansible.builtin.assert:
+        that:
+          - iis_site_name | length > 0
+          - iis_app_pool_name | length > 0
+          - iis_site_path is match('(?i)^C:\\\\inetpub\\\\[^\\\\]+')
+          - deployment_source | length > 0
+        fail_msg: The IIS site, pool, destination, and deployment source must be valid.
+
+    - name: Verify deployment source exists on the Ansible controller
+      ansible.builtin.stat:
+        path: "{{ deployment_source }}"
+      delegate_to: localhost
+      become: false
+      register: deployment_source_info
+
+    - name: Require a deployment source directory
+      ansible.builtin.assert:
+        that:
+          - deployment_source_info.stat.exists
+          - deployment_source_info.stat.isdir
+        fail_msg: "Deployment source directory {{ deployment_source }} does not exist."
+
+    - name: Verify Ansible connectivity
+      ansible.windows.win_ping:
+
+  tasks:
+    - name: Ensure the IIS content directory exists
+      ansible.windows.win_file:
+        path: "{{ iis_site_path }}"
+        state: directory
+
+    - name: Deploy content while controlling the application pool
+      block:
+        - name: Stop the application pool for deployment
+          microsoft.iis.web_app_pool:
+            name: "{{ iis_app_pool_name }}"
+            state: stopped
+
+        - name: Copy website content to the IIS server
+          ansible.windows.win_copy:
+            src: "{{ deployment_source }}/"
+            dest: "{{ iis_site_path }}\\"
+          register: website_copy_result
+
+      always:
+        - name: Start the application pool after deployment
+          microsoft.iis.web_app_pool:
+            name: "{{ iis_app_pool_name }}"
+            state: started
+
+    - name: Ensure the website is started
+      microsoft.iis.website:
+        name: "{{ iis_site_name }}"
+        state: started
+
+  post_tasks:
+    - name: Report deployment result
+      ansible.builtin.debug:
+        msg: >-
+          Deployed {{ deployment_source }} to {{ iis_site_path }} on
+          {{ inventory_hostname }}. Content changed:
+          {{ website_copy_result.changed | default(false) | bool }}.

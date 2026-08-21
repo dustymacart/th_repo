@@ -1,0 +1,137 @@
+pipeline {
+    agent any
+
+    options {
+        disableConcurrentBuilds()
+        timestamps()
+        timeout(time: 30, unit: 'MINUTES')
+    }
+
+    parameters {
+        string(name: 'POKEMON_REPOSITORY_URL', defaultValue: 'https://github.com/dustymacart/th_pokemon.git', description: 'Git repository containing the website code.')
+        string(name: 'POKEMON_BRANCH', defaultValue: 'main', description: 'Git branch to deploy.')
+        choice(name: 'ENVIRONMENT', choices: ['staging'], description: 'Ansible inventory environment.')
+        choice(name: 'TARGET_GROUP', choices: ['winwebservers'], description: 'IIS inventory group to deploy to.')
+        string(name: 'HOST_LIMIT', defaultValue: '', description: 'Optional single-server limit for a staged deployment.')
+        string(name: 'IIS_SITE_NAME', defaultValue: 'pokemonindex', description: 'Existing IIS website name.')
+        string(name: 'IIS_APP_POOL_NAME', defaultValue: 'pokemonindex', description: 'Existing IIS application pool name.')
+        string(name: 'IIS_SITE_PATH', defaultValue: 'C:\\inetpub\\pokemonindex', description: 'Website content directory on Windows.')
+    }
+
+    environment {
+        ANSIBLE_FORCE_COLOR = 'false'
+        ANSIBLE_HOST_KEY_CHECKING = 'true'
+        ANSIBLE_ROOT = '.'
+        WEBSITE_CHECKOUT = 'pokemon-checkout'
+        WEBSITE_SOURCE = 'pokemon-source'
+    }
+
+    stages {
+        stage('Checkout automation') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Checkout website') {
+            steps {
+                dir(env.WEBSITE_CHECKOUT) {
+                    deleteDir()
+                    git branch: params.POKEMON_BRANCH, url: params.POKEMON_REPOSITORY_URL
+                }
+            }
+        }
+
+        stage('Prepare website artifact') {
+            steps {
+                dir(env.WEBSITE_SOURCE) {
+                    deleteDir()
+                }
+                sh '''
+                    set -eu
+                    git -C "$WEBSITE_CHECKOUT" archive HEAD | tar -x -C "$WEBSITE_SOURCE"
+                '''
+            }
+        }
+
+        stage('Install Ansible collections') {
+            steps {
+                sh '''
+                    set -eu
+                    ansible-galaxy collection install \
+                      --requirements-file collections/requirements.yml
+                '''
+            }
+        }
+
+        stage('Validate') {
+            steps {
+                script {
+                    if (!(params.POKEMON_BRANCH ==~ /[A-Za-z0-9._\/-]+/)) {
+                        error('POKEMON_BRANCH contains unsupported characters.')
+                    }
+                    if (params.HOST_LIMIT && !(params.HOST_LIMIT ==~ /[A-Za-z0-9_.-]+/)) {
+                        error('HOST_LIMIT must be a single inventory hostname.')
+                    }
+                    if (!(params.IIS_SITE_NAME ==~ /[A-Za-z0-9_. -]+/)) {
+                        error('IIS_SITE_NAME contains unsupported characters.')
+                    }
+                    if (!(params.IIS_APP_POOL_NAME ==~ /[A-Za-z0-9_. -]+/)) {
+                        error('IIS_APP_POOL_NAME contains unsupported characters.')
+                    }
+                    if (!(params.IIS_SITE_PATH ==~ /(?i)C:\\inetpub\\[^\\]+/)) {
+                        error('IIS_SITE_PATH must be a directory below C:\\inetpub.')
+                    }
+                }
+
+                withCredentials([file(credentialsId: 'ansible-vault-password', variable: 'VAULT_PASSWORD_FILE')]) {
+                    sh '''
+                        set -eu
+                        test -d "$WEBSITE_SOURCE"
+                        test -f "inventories/${ENVIRONMENT}/hosts"
+                        ansible-playbook --syntax-check \
+                          --vault-password-file "$VAULT_PASSWORD_FILE" \
+                          -i "inventories/${ENVIRONMENT}/" \
+                          playbooks/deploy_iis_content.yml \
+                          -e "target_group=${TARGET_GROUP}" \
+                          -e "iis_site_name=${IIS_SITE_NAME}" \
+                          -e "iis_app_pool_name=${IIS_APP_POOL_NAME}" \
+                          -e "iis_site_path=${IIS_SITE_PATH}" \
+                          -e "deployment_source=${WORKSPACE}/${WEBSITE_SOURCE}"
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                withCredentials([file(credentialsId: 'ansible-vault-password', variable: 'VAULT_PASSWORD_FILE')]) {
+                    sh '''
+                        set -eu
+                        limit_args=""
+                        if [ -n "${HOST_LIMIT:-}" ]; then
+                            limit_args="--limit ${HOST_LIMIT}"
+                        fi
+
+                        ansible-playbook \
+                          --vault-password-file "$VAULT_PASSWORD_FILE" \
+                          -i "inventories/${ENVIRONMENT}/" \
+                          playbooks/deploy_iis_content.yml \
+                          -e "target_group=${TARGET_GROUP}" \
+                          -e "iis_site_name=${IIS_SITE_NAME}" \
+                          -e "iis_app_pool_name=${IIS_APP_POOL_NAME}" \
+                          -e "iis_site_path=${IIS_SITE_PATH}" \
+                          -e "deployment_source=${WORKSPACE}/${WEBSITE_SOURCE}" \
+                          ${limit_args}
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            deleteDir()
+        }
+    }
+}
