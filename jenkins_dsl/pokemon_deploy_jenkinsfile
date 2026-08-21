@@ -97,8 +97,7 @@ pipeline {
                           -e "target_group=${TARGET_GROUP}" \
                           -e "iis_site_name=${IIS_SITE_NAME}" \
                           -e "iis_app_pool_name=${IIS_APP_POOL_NAME}" \
-                          -e "iis_site_path=${IIS_SITE_PATH}" \
-                          -e "deployment_source=${WORKSPACE}/${WEBSITE_SOURCE}"
+                          -e "iis_site_path=${IIS_SITE_PATH}"
                     '''
                 }
             }
@@ -122,7 +121,6 @@ pipeline {
                           -e "iis_site_name=${IIS_SITE_NAME}" \
                           -e "iis_app_pool_name=${IIS_APP_POOL_NAME}" \
                           -e "iis_site_path=${IIS_SITE_PATH}" \
-                          -e "deployment_source=${WORKSPACE}/${WEBSITE_SOURCE}" \
                           ${limit_args}
                     '''
                 }
