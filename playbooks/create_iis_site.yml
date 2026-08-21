@@ -24,7 +24,7 @@
     iis_site_bindings:
       - ip: "*"
         port: 8080
-        hostname: ""
+        hostname: "pokemon.digitalcanyon.org"
         protocol: http
 
   pre_tasks:
