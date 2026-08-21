@@ -8,6 +8,7 @@
     iis_app_pool_name: pokemonindex
     iis_site_path: C:\inetpub\pokemonindex
     deployment_source: "{{ playbook_dir }}/../pokemon-source"
+    deployment_staging_path: C:\Windows\Temp\th-pokemon-deploy
 
   pre_tasks:
     - name: Validate deployment settings
@@ -17,7 +18,9 @@
           - iis_app_pool_name | length > 0
           - iis_site_path is match('(?i)^C:\\\\inetpub\\\\[^\\\\]+')
           - deployment_source | length > 0
-        fail_msg: The IIS site, pool, destination, and deployment source must be valid.
+          - deployment_staging_path is match('(?i)^C:\\\\Windows\\\\Temp\\\\[^\\\\]+')
+          - deployment_staging_path | lower != iis_site_path | lower
+        fail_msg: The IIS site, pool, destination, source, and staging path must be valid.
 
     - name: Verify deployment source exists on the Ansible controller
       ansible.builtin.stat:
@@ -42,24 +45,50 @@
         path: "{{ iis_site_path }}"
         state: directory
 
-    - name: Deploy content while controlling the application pool
+    - name: Stage and mirror the repository artifact
       block:
-        - name: Stop the application pool for deployment
-          microsoft.iis.web_app_pool:
-            name: "{{ iis_app_pool_name }}"
-            state: stopped
+        - name: Remove content from the previous deployment staging directory
+          ansible.windows.win_file:
+            path: "{{ deployment_staging_path }}"
+            state: absent
 
-        - name: Copy website content to the IIS server
+        - name: Create a clean deployment staging directory
+          ansible.windows.win_file:
+            path: "{{ deployment_staging_path }}"
+            state: directory
+
+        - name: Upload the repository artifact to staging
           ansible.windows.win_copy:
             src: "{{ deployment_source }}/"
-            dest: "{{ iis_site_path }}\\"
-          register: website_copy_result
+            dest: "{{ deployment_staging_path }}\\"
+          register: website_upload_result
+
+        - name: Mirror staged content while controlling the application pool
+          block:
+            - name: Stop the application pool for deployment
+              microsoft.iis.web_app_pool:
+                name: "{{ iis_app_pool_name }}"
+                state: stopped
+
+            - name: Mirror the repository into the IIS content directory
+              community.windows.win_robocopy:
+                src: "{{ deployment_staging_path }}"
+                dest: "{{ iis_site_path }}"
+                recurse: true
+                purge: true
+              register: website_mirror_result
+
+          always:
+            - name: Start the application pool after deployment
+              microsoft.iis.web_app_pool:
+                name: "{{ iis_app_pool_name }}"
+                state: started
 
       always:
-        - name: Start the application pool after deployment
-          microsoft.iis.web_app_pool:
-            name: "{{ iis_app_pool_name }}"
-            state: started
+        - name: Remove the deployment staging directory
+          ansible.windows.win_file:
+            path: "{{ deployment_staging_path }}"
+            state: absent
 
     - name: Ensure the website is started
       microsoft.iis.website:
@@ -71,5 +100,6 @@
       ansible.builtin.debug:
         msg: >-
           Deployed {{ deployment_source }} to {{ iis_site_path }} on
-          {{ inventory_hostname }}. Content changed:
-          {{ website_copy_result.changed | default(false) | bool }}.
+          {{ inventory_hostname }} as an authoritative mirror. Files absent
+          from the repository were removed. Content changed:
+          {{ website_mirror_result.changed | default(false) | bool }}.
