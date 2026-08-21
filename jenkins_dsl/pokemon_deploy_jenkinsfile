@@ -49,6 +49,7 @@ pipeline {
                 }
                 sh '''
                     set -eu
+                    mkdir -p "$WEBSITE_SOURCE"
                     git -C "$WEBSITE_CHECKOUT" archive HEAD | tar -x -C "$WEBSITE_SOURCE"
                 '''
             }
