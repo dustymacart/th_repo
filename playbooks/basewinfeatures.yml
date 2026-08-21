@@ -1,0 +1,93 @@
+---
+- name: Configure the Windows web-server baseline
+  hosts: "{{ target_group | default('winwebservers') }}"
+  gather_facts: false
+
+  vars:
+    # Override these lists in inventory variables or with an extra-vars file.
+    windows_web_features:
+      - Web-Server
+      - Web-Default-Doc
+      - Web-Static-Content
+      - Web-Http-Errors
+      - Web-Http-Redirect
+      - Web-Http-Logging
+      - Web-Log-Libraries
+      - Web-Request-Monitor
+      - Web-Http-Tracing
+      - Web-Stat-Compression
+      - Web-Dyn-Compression
+      - Web-Filtering
+      - Web-Basic-Auth
+      - Web-Windows-Auth
+      - Web-Net-Ext45
+      - Web-Asp-Net45
+      - Web-ISAPI-Ext
+      - Web-ISAPI-Filter
+      - Web-WebSockets
+      - Web-Mgmt-Console
+      - Web-Scripting-Tools
+
+    windows_web_packages:
+      - nodejs-lts
+      - urlrewrite
+      - iis-arr
+
+    windows_web_reboot: true
+
+  pre_tasks:
+    - name: Verify Ansible connectivity
+      ansible.windows.win_ping:
+
+  tasks:
+    - name: Install Windows web-server features
+      ansible.windows.win_feature:
+        name: "{{ windows_web_features }}"
+        state: present
+        include_management_tools: true
+      register: windows_web_feature_result
+
+    - name: Reboot when Windows feature installation requires it
+      ansible.windows.win_reboot:
+        reboot_timeout: 1200
+      when:
+        - windows_web_reboot | bool
+        - windows_web_feature_result.reboot_required | default(false) | bool
+
+    - name: Install web-server software packages
+      chocolatey.chocolatey.win_chocolatey:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ windows_web_packages }}"
+      register: windows_web_package_result
+
+    - name: Ensure IIS is enabled and running
+      ansible.windows.win_service:
+        name: W3SVC
+        start_mode: auto
+        state: started
+
+    - name: Verify Node.js is installed
+      ansible.windows.win_command:
+        argv:
+          - C:\Program Files\nodejs\node.exe
+          - --version
+      register: node_version_result
+      changed_when: false
+
+    - name: Verify IIS responds locally
+      ansible.windows.win_uri:
+        url: http://localhost/
+        method: GET
+        status_code:
+          - 200
+          - 403
+      register: iis_baseline_http_check
+
+  post_tasks:
+    - name: Report Windows web-server baseline
+      ansible.builtin.debug:
+        msg: >-
+          Web-server baseline completed on {{ inventory_hostname }}.
+          Node.js version: {{ node_version_result.stdout | trim }}.
+          IIS HTTP status: {{ iis_baseline_http_check.status_code }}.
