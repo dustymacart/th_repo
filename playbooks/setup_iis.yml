@@ -1,0 +1,56 @@
+---
+- name: Install and configure IIS
+  hosts: "{{ target_group | default('winwebservers') }}"
+  gather_facts: false
+
+  vars:
+    iis_features:
+      - Web-Server
+      - Web-Default-Doc
+      - Web-Static-Content
+      - Web-Http-Errors
+      - Web-Http-Logging
+      - Web-Request-Monitor
+      - Web-Stat-Compression
+      - Web-Filtering
+      - Web-Mgmt-Tools
+
+  pre_tasks:
+    - name: Verify Ansible connectivity
+      ansible.windows.win_ping:
+
+  tasks:
+    - name: Install IIS and management tools
+      ansible.windows.win_feature:
+        name: "{{ iis_features }}"
+        state: present
+        include_management_tools: true
+      register: iis_feature_result
+
+    - name: Reboot when IIS feature installation requires it
+      ansible.windows.win_reboot:
+        reboot_timeout: 1200
+      when: iis_feature_result.reboot_required | default(false) | bool
+
+    - name: Ensure the IIS web service is enabled and running
+      ansible.windows.win_service:
+        name: W3SVC
+        start_mode: auto
+        state: started
+
+    - name: Verify the default IIS website responds locally
+      ansible.windows.win_uri:
+        url: http://localhost/
+        method: GET
+        status_code: 200
+      register: iis_http_check
+      retries: 5
+      delay: 5
+      until: iis_http_check.status_code | default(0) == 200
+
+  post_tasks:
+    - name: Report IIS installation status
+      ansible.builtin.debug:
+        msg: >-
+          IIS is installed and responding on {{ inventory_hostname }}.
+          Feature state changed: {{ iis_feature_result.changed | bool }}.
